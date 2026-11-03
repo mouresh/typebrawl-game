@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PitLane Typing – Race cars by typing fast</title>
+<meta name="description" content="A free typing race game. Type the text to drive your car, beat the bots and improve your speed and accuracy.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏁</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --grass:#1f5a47; --grass-2:#184a3a; --asphalt:#2a2f38; --asphalt-2:#353b46;
+  --paper:#f4efe3; --ink:#16201c; --yellow:#f6c744; --red:#e4402f; --good:#2e8b57; --bad:#d6301f;
+  --head:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--grass);color:var(--paper);font-family:var(--head);font-weight:500;line-height:1.5;min-height:100vh;
+  background-image:repeating-linear-gradient(90deg,transparent 0 48px,rgba(255,255,255,.025) 48px 96px)}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1;margin:0;font-weight:800;letter-spacing:-.03em}
+h1 small{display:block;font-size:1rem;font-weight:500;letter-spacing:0;opacity:.8;margin-top:6px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--grass-2);border:2px solid rgba(255,255,255,.15);border-radius:10px;padding:6px 12px;font-size:.85rem}
+.chip b{font-family:var(--mono);font-size:1.05rem;color:var(--yellow);margin-left:6px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+label{font-size:.9rem;display:flex;gap:6px;align-items:center}
+select,button{font:inherit;font-weight:700;border-radius:8px;border:2px solid var(--ink);padding:8px 12px;cursor:pointer}
+select{background:var(--paper);color:var(--ink)}
+button.go{background:var(--yellow);color:var(--ink);box-shadow:0 4px 0 #b88f13;padding:9px 22px}
+button.go:active{transform:translateY(3px);box-shadow:0 1px 0 #b88f13}
+button.ghost{background:transparent;color:var(--paper);border-color:rgba(255,255,255,.4)}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+
+/* Track */
+.track{background:var(--asphalt);border:6px solid transparent;border-radius:14px;position:relative;overflow:hidden;
+  border-image:repeating-linear-gradient(90deg,var(--red) 0 22px,#fff 22px 44px) 6}
+.lane{position:relative;height:64px;border-bottom:3px dashed rgba(246,199,68,.55);display:flex;align-items:center}
+.lane:last-child{border-bottom:0}
+.lane .name{position:absolute;left:10px;top:4px;font-size:.72rem;opacity:.75;z-index:2}
+.lane .pct{position:absolute;right:56px;top:4px;font-family:var(--mono);font-size:.72rem;opacity:.75;z-index:2}
+.lane .run{position:absolute;left:8px;right:44px;height:100%}
+.car{position:absolute;top:50%;margin-top:-16px;left:0;width:64px;height:32px;transition:left .12s linear;filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.finish{position:absolute;right:0;top:0;bottom:0;width:36px;
+  background:repeating-conic-gradient(#fff 0 25%,#111 0 50%) 0 0/12px 12px}
+.lane.me{background:rgba(255,255,255,.05)}
+.lane.me .name{opacity:1;color:var(--yellow);font-weight:800}
+
+/* Typing */
+.panel{margin-top:16px;background:var(--paper);color:var(--ink);border-radius:14px;padding:18px;position:relative}
+.stats{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+.stat{font-size:.8rem}
+.stat b{display:block;font-family:var(--mono);font-size:1.6rem;line-height:1.1}
+.text{font-family:var(--mono);font-size:clamp(1.05rem,2.6vw,1.45rem);line-height:1.9;white-space:pre-wrap;word-break:break-word;
+  user-select:none;cursor:text;min-height:5.4em;max-width:80ch;letter-spacing:.01em}
+.text span{border-radius:3px}
+.text .ok{color:var(--good)}
+.text .bad{color:#fff;background:var(--bad)}
+.text .cur{background:rgba(246,199,68,.55);box-shadow:inset 0 -3px 0 var(--ink)}
+.text.idle{opacity:.45;filter:blur(1px)}
+.hint{font-size:.85rem;opacity:.7;margin-top:8px}
+#inp{position:absolute;opacity:0;pointer-events:none;left:0;top:0;width:1px;height:1px}
+.bar{height:8px;background:#d9d2bf;border-radius:4px;margin-bottom:14px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--red);transition:width .1s}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;background:rgba(10,24,19,.78);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.overlay.show{display:flex}
+.count{font-size:clamp(6rem,30vw,14rem);font-weight:800;color:var(--yellow);text-shadow:0 8px 0 rgba(0,0,0,.35)}
+.modal{background:var(--paper);color:var(--ink);border-radius:16px;padding:26px;max-width:440px;width:100%;text-align:center}
+.modal h2{margin:0 0 4px;font-size:2rem;letter-spacing:-.02em}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.grid div{background:#e8e1cd;border-radius:10px;padding:10px 4px;font-size:.8rem}
+.grid b{display:block;font-family:var(--mono);font-size:1.5rem}
+.modal .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.modal button.ghost{color:var(--ink);border-color:var(--ink)}
+.rank{font-size:.95rem;margin:0}
+
+/* History + tips */
+section.info{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--grass-2);border-radius:14px;padding:16px 18px;border:2px solid rgba(255,255,255,.12)}
+.card h3{margin:0 0 8px;font-size:1.15rem}
+.card ul{margin:0;padding-left:18px}
+.card li{margin:4px 0;font-size:.92rem}
+table{width:100%;border-collapse:collapse;font-size:.88rem;font-family:var(--mono)}
+td,th{text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.12)}
+footer{margin-top:28px;text-align:center;font-size:.85rem;opacity:.7}
+@media (max-width:560px){.lane{height:56px}.car{width:52px}.stat b{font-size:1.3rem}}
+@media (prefers-reduced-motion:reduce){.car,.bar i{transition:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>PitLane Typing<small>Type fast. Type clean. Win the race.</small></h1>
+    <div class="chips" aria-label="Your records">
+      <div class="chip">Best WPM<b id="bestWpm">0</b></div>
+      <div class="chip">Races<b id="raceCount">0</b></div>
+      <div class="chip">Wins<b id="winCount">0</b></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <label>Rivals
+      <select id="level">
+        <option value="easy">Rookie (25–40 WPM)</option>
+        <option value="medium" selected>Club (40–60 WPM)</option>
+        <option value="hard">Pro (60–90 WPM)</option>
+      </select>
+    </label>
+    <label>Text
+      <select id="mode">
+        <option value="words" selected>Common words</option>
+        <option value="sentences">Sentences</option>
+        <option value="punct">Punctuation &amp; numbers</option>
+      </select>
+    </label>
+    <button class="go" id="startBtn">Start race</button>
+    <button class="ghost" id="resetBtn" title="Shortcut: Esc">Restart (Esc)</button>
+  </div>
+
+  <div class="track" id="track" aria-label="Race track"></div>
+
+  <div class="panel" id="panel">
+    <div class="bar"><i id="bar"></i></div>
+    <div class="stats" aria-live="off">
+      <div class="stat">Speed<b id="wpm">0</b>WPM</div>
+      <div class="stat">Accuracy<b id="acc">100%</b>&nbsp;</div>
+      <div class="stat">Time<b id="time">0.0s</b>&nbsp;</div>
+      <div class="stat">Position<b id="pos">–</b>&nbsp;</div>
+    </div>
+    <div class="text idle" id="text" tabindex="0" role="textbox" aria-label="Text to type">Press “Start race”, wait for the lights, then type the text that appears here.</div>
+    <textarea id="inp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Typing input"></textarea>
+    <p class="hint" id="hint">Tip: a wrong letter stops your car until you fix it with Backspace.</p>
+  </div>
+
+  <section class="info">
+    <div class="card">
+      <h3>Recent races</h3>
+      <table><thead><tr><th>Place</th><th>WPM</th><th>Acc</th><th>Mode</th></tr></thead><tbody id="hist"><tr><td colspan="4">No races yet.</td></tr></tbody></table>
+    </div>
+    <div class="card">
+      <h3>Get faster</h3>
+      <ul>
+        <li>Keep your fingers on the home row (A S D F · J K L ;).</li>
+        <li>Look at the screen, not the keyboard.</li>
+        <li>Accuracy first. Speed follows once errors drop.</li>
+        <li>Short daily races beat one long session.</li>
+        <li>Stay relaxed: shoulders down, wrists floating.</li>
+      </ul>
+    </div>
+  </section>
+  <footer>Free to use. Your records are saved only in your own browser.</footer>
+</div>
+
+<div class="overlay" id="cdOv"><div class="count" id="cd" aria-live="assertive">3</div></div>
+<div class="overlay" id="resOv" role="dialog" aria-modal="true" aria-labelledby="resTitle">
+  <div class="modal">
+    <h2 id="resTitle">Finished!</h2>
+    <p class="rank" id="resRank"></p>
+    <div class="grid">
+      <div>Speed<b id="rWpm">0</b>WPM</div>
+      <div>Accuracy<b id="rAcc">0%</b>&nbsp;</div>
+      <div>Time<b id="rTime">0s</b>&nbsp;</div>
+    </div>
+    <p class="rank" id="resNote"></p>
+    <div class="row" style="margin-top:14px">
+      <button class="go" id="againBtn">Race again</button>
+      <button class="ghost" id="closeBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $ = function(id){return document.getElementById(id)};
+var WORDS = "the be to of and a in that have it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us great where help through much before line right too mean old same tell boy follow came want show also around form three small set put end does another large must big even such because turn here why ask went men read need land different home move try kind hand picture again change off play spell air away animal house point page letter mother answer found study still learn should world high every near add food between own below country plant last school father keep tree never start city earth eyes light thought head under story saw left don't few while along might close something seem next hard open example begin life always those both paper together got group often run important until children side feet car mile night walk white sea began grow took river four carry state once book hear stop without second later miss idea enough eat face watch far indian real almost let above girl sometimes mountain cut young talk soon list song being leave family it's".split(" ");
+var SENT = [
+ "The quick brown fox jumps over the lazy dog while the engine roars on the starting grid.",
+ "A steady rhythm on the keyboard is faster than a wild sprint full of mistakes.",
+ "Practice a little every day and you will be surprised how quickly your speed grows.",
+ "The driver took the final corner wide, hit the throttle and flew across the finish line.",
+ "Good typists do not look at their hands; they trust their fingers and watch the screen.",
+ "Every great race starts with a calm breath, a clear mind and a perfect first lap.",
+ "Learning to type well is like learning to drive: patience first, speed second, style last.",
+ "Rain on the track made the cars slide, but the champion stayed smooth and in control."
+];
+var PUNCT = [
+ "Order #42 shipped on 12/05, total: $89.50 (tax included); call 555-0148 now!",
+ "\"Wait,\" she said, \"is it 3:45 or 4:15? Check gate B-7, row 22, seat 9.\"",
+ "Lap 18 of 60: best time 1:32.481, top speed 312 km/h, tyres at 87% - go, go, go!",
+ "Email: team@pitlane.dev; password rules: 8+ characters, 2 numbers, 1 symbol (e.g. @ or !)."
+];
+var BOTS = [{n:"Blaze",c:"#4aa3ff"},{n:"Viper",c:"#9b6bff"},{n:"Ghost",c:"#f2f2f2"}];
+var RANGE = {easy:[25,40],medium:[40,60],hard:[60,90]};
+var ME_COLOR = "#e4402f";
+
+function carSVG(c){
+  return '<svg viewBox="0 0 64 32" width="100%" height="100%" aria-hidden="true">'+
+  '<rect x="2" y="12" width="60" height="12" rx="5" fill="'+c+'"/>'+
+  '<path d="M16 13 L24 4 H40 L50 13Z" fill="'+c+'"/>'+
+  '<path d="M20 12 L26 6 H32 V12Z M35 12 V6 H39 L45 12Z" fill="#cfe9ff" opacity=".9"/>'+
+  '<rect x="2" y="17" width="60" height="3" fill="rgba(0,0,0,.25)"/>'+
+  '<rect x="58" y="14" width="4" height="3" fill="#ffe27a"/>'+
+  '<circle cx="16" cy="25" r="6" fill="#111"/><circle cx="16" cy="25" r="2.5" fill="#bbb"/>'+
+  '<circle cx="48" cy="25" r="6" fill="#111"/><circle cx="48" cy="25" r="2.5" fill="#bbb"/></svg>';
+}
+
+var S = {text:"",state:"idle",start:0,typed:0,errors:0,prevLen:0,racers:[],raf:0,last:0,done:false,place:0};
+var track=$("track"),textEl=$("text"),inp=$("inp");
+
+function load(){
+  try{ var d=JSON.parse(localStorage.getItem("pitlane")||"{}"); return {best:d.best||0,races:d.races||0,wins:d.wins||0,hist:d.hist||[]}; }
+  catch(e){ return {best:0,races:0,wins:0,hist:[]}; }
+}
+function save(d){ try{ localStorage.setItem("pitlane",JSON.stringify(d)); }catch(e){} }
+function renderRecords(){
+  var d=load();
+  $("bestWpm").textContent=d.best; $("raceCount").textContent=d.races; $("winCount").textContent=d.wins;
+  var h=$("hist");
+  if(!d.hist.length){ h.innerHTML='<tr><td colspan="4">No races yet.</td></tr>'; return; }
+  h.innerHTML=d.hist.map(function(r){return "<tr><td>"+r.p+"</td><td>"+r.w+"</td><td>"+r.a+"%</td><td>"+r.m+"</td></tr>";}).join("");
+}
+
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+function makeText(mode){
+  if(mode==="sentences"){ var a=pick(SENT),b=pick(SENT); while(b===a)b=pick(SENT); return a+" "+b; }
+  if(mode==="punct") return pick(PUNCT);
+  var w=[]; for(var i=0;i<32;i++) w.push(pick(WORDS)); return w.join(" ");
+}
+
+function buildTrack(){
+  S.racers=[{name:"You",color:ME_COLOR,me:true,p:0,speed:0,fin:false}];
+  BOTS.forEach(function(b){S.racers.push({name:b.n,color:b.c,me:false,p:0,speed:0,fin:false})});
+  track.innerHTML="";
+  S.racers.forEach(function(r){
+    var l=document.createElement("div"); l.className="lane"+(r.me?" me":"");
+    l.innerHTML='<span class="name">'+r.name+'</span><span class="pct">0%</span><div class="run"><div class="car">'+carSVG(r.color)+'</div></div><div class="finish"></div>';
+    track.appendChild(l); r.lane=l; r.car=l.querySelector(".car"); r.pct=l.querySelector(".pct");
+  });
+  drawCars();
+}
+function drawCars(){
+  S.racers.forEach(function(r){
+    var run=r.lane.querySelector(".run");
+    var max=run.clientWidth-r.car.clientWidth;
+    r.car.style.left=(max*Math.min(r.p,1))+"px";
+    r.pct.textContent=Math.round(Math.min(r.p,1)*100)+"%";
+  });
+}
+
+function renderText(){
+  var v=inp.value,t=S.text,html="";
+  for(var i=0;i<t.length;i++){
+    var cls="";
+    if(i<v.length) cls = v[i]===t[i]?"ok":"bad";
+    else if(i===v.length) cls="cur";
+    var ch=t[i]; if(ch==="&")ch="&amp;"; else if(ch==="<")ch="&lt;"; else if(ch===">")ch="&gt;";
+    html+='<span class="'+cls+'">'+ch+'</span>';
+  }
+  textEl.innerHTML=html;
+}
+function correctPrefix(){
+  var v=inp.value,t=S.text,i=0; while(i<v.length&&i<t.length&&v[i]===t[i])i++; return i;
+}
+function elapsed(){ return (performance.now()-S.start)/1000; }
+function wpmNow(){ var s=elapsed(); return s>0.5? Math.round((correctPrefix()/5)/(s/60)):0; }
+function accNow(){ return S.typed? Math.max(0,Math.round(100*(S.typed-S.errors)/S.typed)):100; }
+
+function startRace(){
+  if(S.state==="count"||S.state==="race") cancelAll();
+  S.text=makeText($("mode").value);
+  S.typed=0;S.errors=0;S.prevLen=0;S.done=false;S.place=0;
+  inp.value=""; inp.disabled=true;
+  buildTrack(); textEl.className="text idle"; textEl.textContent=S.text;
+  $("bar").style.width="0"; $("wpm").textContent="0"; $("acc").textContent="100%"; $("time").textContent="0.0s"; $("pos").textContent="–";
+  $("resOv").classList.remove("show");
+  S.state="count";
+  var n=3,ov=$("cdOv"),cd=$("cd"); ov.classList.add("show"); cd.textContent=n; beep(440,.12);
+  S.timer=setInterval(function(){
+    n--;
+    if(n>0){cd.textContent=n;beep(440,.12);}
+    else if(n===0){cd.textContent="GO!";beep(880,.3);go();}
+    else {clearInterval(S.timer);ov.classList.remove("show");}
+  },800);
+}
+function go(){
+  S.state="race"; S.start=performance.now(); S.last=S.start;
+  var r=RANGE[$("level").value];
+  S.racers.forEach(function(x){ if(!x.me) x.speed=r[0]+Math.random()*(r[1]-r[0]); });
+  inp.disabled=false; inp.maxLength=S.text.length; inp.focus();
+  textEl.className="text"; renderText();
+  setTimeout(function(){ $("cdOv").classList.remove("show"); },500);
+  S.raf=requestAnimationFrame(tick);
+}
+function tick(now){
+  if(S.state!=="race")return;
+  var dt=(now-S.last)/1000; S.last=now;
+  var len=S.text.length;
+  S.racers.forEach(function(r){
+    if(r.me){ r.p=correctPrefix()/len; }
+    else if(!r.fin){
+      var wob=0.85+Math.random()*0.3;
+      r.p+= (r.speed*wob*5/60)*dt/len;
+      if(r.p>=1){ r.p=1; r.fin=true; r.time=elapsed(); S.place++; r.place=S.place; }
+    }
+  });
+  drawCars();
+  $("bar").style.width=(S.racers[0].p*100)+"%";
+  $("wpm").textContent=wpmNow(); $("acc").textContent=accNow()+"%"; $("time").textContent=elapsed().toFixed(1)+"s";
+  var ahead=S.racers.filter(function(r){return !r.me&&r.p>S.racers[0].p}).length;
+  $("pos").textContent=ordinal(ahead+1);
+  S.raf=requestAnimationFrame(tick);
+}
+function ordinal(n){return n+(n===1?"st":n===2?"nd":n===3?"rd":"th")}
+
+inp.addEventListener("input",function(){
+  if(S.state!=="race")return;
+  var v=inp.value;
+  if(v.length>S.prevLen){
+    for(var i=S.prevLen;i<v.length;i++){ S.typed++; if(v[i]!==S.text[i]){S.errors++;beep(160,.05);} }
+  }
+  S.prevLen=v.length;
+  renderText();
+  if(v===S.text) finish();
+});
+function finish(){
+  if(S.done)return; S.done=true; S.state="done";
+  cancelAnimationFrame(S.raf);
+  var me=S.racers[0]; me.p=1; drawCars();
+  var secs=elapsed(), wpm=Math.round((S.text.length/5)/(secs/60)), acc=accNow();
+  S.place++; var place=S.place;
+  // Bots that haven't finished are behind you; count only those already finished.
+  var ahead=S.racers.filter(function(r){return !r.me&&r.fin}).length; place=ahead+1;
+  inp.disabled=true; inp.blur();
+  var d=load(), newBest=wpm>d.best;
+  d.races++; if(place===1)d.wins++; if(newBest)d.best=wpm;
+  d.hist.unshift({p:ordinal(place),w:wpm,a:acc,m:$("mode").selectedOptions[0].text.split(" ")[0]});
+  d.hist=d.hist.slice(0,8); save(d); renderRecords();
+  $("resTitle").textContent= place===1?"You won! 🏆":place===2?"Podium finish!":place===3?"Third place":"Keep pushing!";
+  $("resRank").textContent="You finished "+ordinal(place)+" of 4.";
+  $("rWpm").textContent=wpm; $("rAcc").textContent=acc+"%"; $("rTime").textContent=secs.toFixed(1)+"s";
+  $("resNote").textContent= newBest? "New personal best speed!" : acc<92? "Slow down a little: clean typing is faster in the end." : "Nice control. Try a harder rival next.";
+  beep(place===1?988:523,.35);
+  setTimeout(function(){ $("resOv").classList.add("show"); $("againBtn").focus(); },450);
+}
+function cancelAll(){ clearInterval(S.timer); cancelAnimationFrame(S.raf); $("cdOv").classList.remove("show"); S.state="idle"; inp.disabled=true; }
+function reset(){
+  cancelAll(); $("resOv").classList.remove("show"); buildTrack();
+  textEl.className="text idle"; textEl.textContent="Press “Start race”, wait for the lights, then type the text that appears here.";
+  $("bar").style.width="0"; $("wpm").textContent="0"; $("acc").textContent="100%"; $("time").textContent="0.0s"; $("pos").textContent="–";
+}
+
+/* tiny sound effects (WebAudio, no files) */
+var actx=null;
+function beep(f,d){
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    var o=actx.createOscillator(),g=actx.createGain();
+    o.type="square"; o.frequency.value=f; g.gain.value=.04;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime+d);
+  }catch(e){}
+}
+
+$("startBtn").addEventListener("click",startRace);
+$("againBtn").addEventListener("click",startRace);
+$("resetBtn").addEventListener("click",reset);
+$("closeBtn").addEventListener("click",function(){ $("resOv").classList.remove("show"); $("startBtn").focus(); });
+textEl.addEventListener("click",function(){ if(S.state==="race")inp.focus(); });
+document.addEventListener("keydown",function(e){
+  if(e.key==="Escape"){ reset(); }
+  if(S.state==="race" && document.activeElement!==inp && e.key.length===1 && !e.ctrlKey && !e.metaKey){ inp.focus(); }
+});
+window.addEventListener("resize",drawCars);
+buildTrack(); renderRecords();
+})();
+</script>
+</body>
+</html>

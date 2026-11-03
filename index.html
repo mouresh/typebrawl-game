@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeBrawl – Fight by typing fast</title>
+<meta name="description" content="A free typing fighting game. Every word you type is a punch. Beat the fighters and improve your typing speed and accuracy.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#1c1633; --night-2:#2a2150; --floor:#c8793a; --floor-2:#a85f2a; --paper:#fbf3e4; --ink:#1b1326;
+  --red:#ef4a2f; --gold:#ffcf4a; --hp:#47d17a; --hp-low:#f0b429; --hp-crit:#ef4a2f;
+  --head:"Dela Gothic One",Impact,"Arial Black",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--night);color:var(--paper);font-family:var(--mono);font-weight:500;line-height:1.5;min-height:100vh}
+.wrap{max-width:980px;margin:0 auto;padding:18px 14px 44px}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:10px;margin-bottom:14px}
+h1{font-family:var(--head);font-weight:400;font-size:clamp(2rem,7vw,3.6rem);line-height:1;margin:0;letter-spacing:.01em;transform:skewX(-6deg);text-shadow:4px 4px 0 var(--red)}
+.sub{font-size:.85rem;opacity:.75;margin-top:6px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--night-2);border-radius:8px;padding:5px 11px;font-size:.78rem}
+.chip b{color:var(--gold);margin-left:6px;font-size:1rem}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+label{font-size:.85rem;display:flex;gap:6px;align-items:center}
+select,button{font:inherit;font-weight:800;border-radius:8px;border:2px solid var(--paper);padding:8px 12px;cursor:pointer;background:var(--paper);color:var(--ink)}
+button.go{background:var(--gold);border-color:var(--ink);box-shadow:0 4px 0 #b8860b;padding:9px 24px}
+button.go:active{transform:translateY(3px);box-shadow:0 1px 0 #b8860b}
+button.ghost{background:transparent;color:var(--paper);border-color:rgba(255,255,255,.4)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+/* HUD */
+.hud{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start;margin-bottom:8px}
+.side.r{text-align:right}
+.nm{font-family:var(--head);font-size:1.1rem}
+.hpbar{height:22px;background:#0d0a1a;border:3px solid var(--paper);border-radius:6px;overflow:hidden;position:relative;transform:skewX(-12deg)}
+.hpbar i{position:absolute;top:0;bottom:0;left:0;width:100%;background:var(--hp);transition:width .25s,background .25s}
+.side.r .hpbar i{left:auto;right:0}
+.meter{height:7px;background:#0d0a1a;margin-top:5px;border-radius:4px;overflow:hidden;width:70%}
+.side.r .meter{margin-left:auto}
+.meter i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.meter.full i{animation:pulse .5s infinite alternate}
+.pips{display:flex;gap:5px;margin-top:5px}.side.r .pips{justify-content:flex-end}
+.pip{width:14px;height:14px;border-radius:50%;border:2px solid var(--paper)}
+.pip.w{background:var(--gold);border-color:var(--gold)}
+.mid{text-align:center}
+.timer{font-family:var(--head);font-size:2.2rem;line-height:1}
+.rnd{font-size:.75rem;opacity:.8}
+
+/* Arena */
+.arena{position:relative;height:300px;border-radius:14px;overflow:hidden;border:4px solid var(--paper);
+  background:linear-gradient(#ff9a52 0%,#ffcf7a 42%,#6a3d86 42.2%,#2a2150 62%,var(--floor) 62.2%,var(--floor-2) 100%)}
+.arena::before{content:"";position:absolute;left:0;right:0;bottom:0;height:38%;
+  background:repeating-linear-gradient(90deg,transparent 0 78px,rgba(0,0,0,.12) 78px 80px)}
+.sun{position:absolute;left:50%;top:12%;width:110px;height:110px;margin-left:-55px;border-radius:50%;background:#ffe9a8;opacity:.8}
+.arena.shake{animation:shake .25s}
+.fighter{position:absolute;bottom:20px;width:130px;height:208px;transform-origin:bottom center}
+.p1{left:15%;--dir:1}.p2{right:15%;--dir:-1}
+.p2 svg{transform:scaleX(-1)}
+.arm{transition:transform .08s}
+.fighter.punch{animation:punch .28s ease-out}
+.fighter.punch .arm{transform:translateX(30px)}
+.fighter.hit{animation:hit .3s}
+.fighter.hit svg{filter:brightness(2.2) saturate(.4)}
+.fighter.ko{transform:translateX(calc(var(--dir) * -60px)) rotate(calc(var(--dir) * -82deg));transition:transform .5s ease-in}
+.fighter.win{animation:bounce .5s infinite alternate}
+.float{position:absolute;font-family:var(--head);font-size:1.9rem;pointer-events:none;animation:rise .9s forwards;text-shadow:2px 2px 0 #000;z-index:5}
+.banner{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-family:var(--head);font-size:clamp(2.4rem,10vw,5rem);color:var(--gold);text-shadow:5px 5px 0 var(--red);background:rgba(20,10,40,.45);z-index:8;text-align:center;line-height:1.1}
+.banner.show{display:flex}
+@keyframes punch{0%{transform:translateX(0)}40%{transform:translateX(calc(var(--dir)*50px))}100%{transform:translateX(0)}}
+@keyframes hit{0%,100%{transform:translateX(0)}25%{transform:translateX(calc(var(--dir)*-18px)) rotate(calc(var(--dir)*-4deg))}60%{transform:translateX(calc(var(--dir)*-6px))}}
+@keyframes bounce{to{transform:translateY(-14px)}}
+@keyframes rise{from{opacity:1;transform:translateY(0) scale(.8)}to{opacity:0;transform:translateY(-70px) scale(1.2)}}
+@keyframes shake{0%,100%{transform:translate(0)}25%{transform:translate(-5px,3px)}50%{transform:translate(5px,-3px)}75%{transform:translate(-3px,-2px)}}
+@keyframes pulse{to{background:#fff}}
+
+/* Typing panel */
+.panel{margin-top:14px;background:var(--paper);color:var(--ink);border-radius:14px;padding:16px 18px;position:relative;cursor:text}
+.panel.special{box-shadow:0 0 0 4px var(--gold),0 0 28px 6px rgba(255,207,74,.7)}
+.stats{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+.stat{font-size:.72rem}
+.stat b{display:block;font-size:1.5rem;line-height:1.1}
+.word{font-size:clamp(2rem,8vw,3.4rem);font-weight:800;letter-spacing:.05em;min-height:1.3em;word-break:break-all}
+.word .ok{color:#1d9a55}
+.word .cur{background:var(--gold);box-shadow:inset 0 -5px 0 var(--ink)}
+.word.wrong{animation:shake .2s;color:var(--red)}
+.tag{display:inline-block;background:var(--red);color:#fff;font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:5px;margin-left:8px;vertical-align:middle;letter-spacing:.05em}
+.queue{opacity:.5;font-size:1.05rem;margin-top:2px}
+.hint{font-size:.8rem;opacity:.7;margin:8px 0 0}
+#inp{position:absolute;opacity:0;left:0;top:0;width:1px;height:1px}
+
+.overlay{position:fixed;inset:0;background:rgba(14,8,30,.82);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.overlay.show{display:flex}
+.modal{background:var(--paper);color:var(--ink);border-radius:16px;padding:26px;max-width:440px;width:100%;text-align:center}
+.modal h2{font-family:var(--head);font-weight:400;margin:0 0 4px;font-size:2.2rem}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.grid div{background:#eadfc8;border-radius:10px;padding:10px 4px;font-size:.72rem}
+.grid b{display:block;font-size:1.4rem}
+.modal .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.modal button.ghost{color:var(--ink);border-color:var(--ink)}
+.modal p{margin:4px 0}
+
+section.info{margin-top:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--night-2);border-radius:14px;padding:14px 18px}
+.card h3{font-family:var(--head);font-weight:400;margin:0 0 8px;font-size:1.1rem}
+.card ul{margin:0;padding-left:18px;font-size:.85rem}.card li{margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+td,th{text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.12)}
+footer{margin-top:24px;text-align:center;font-size:.8rem;opacity:.65}
+@media (max-width:600px){.arena{height:240px}.fighter{width:96px;height:154px}.hud{gap:6px}.nm{font-size:.9rem}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>TypeBrawl</h1><div class="sub">Every word you type is a punch. Win 2 rounds to win the fight.</div></div>
+    <div class="chips" aria-label="Your records">
+      <div class="chip">Wins<b id="rWins">0</b></div>
+      <div class="chip">Best WPM<b id="rBest">0</b></div>
+      <div class="chip">Best combo<b id="rCombo">0</b></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <label>Opponent
+      <select id="level">
+        <option value="easy">Rusty (easy)</option>
+        <option value="medium" selected>Brick (medium)</option>
+        <option value="hard">Shadow (hard)</option>
+      </select>
+    </label>
+    <button class="go" id="startBtn">Start fight</button>
+    <button class="ghost" id="quitBtn">Quit (Esc)</button>
+  </div>
+
+  <div class="hud">
+    <div class="side"><div class="nm">You</div><div class="hpbar"><i id="hp1"></i></div><div class="meter" id="meter"><i id="meterI"></i></div><div class="pips" id="pips1"></div></div>
+    <div class="mid"><div class="timer" id="timer">60</div><div class="rnd" id="rnd">Round 1</div></div>
+    <div class="side r"><div class="nm" id="oppName">Brick</div><div class="hpbar"><i id="hp2"></i></div><div class="pips" id="pips2"></div></div>
+  </div>
+
+  <div class="arena" id="arena">
+    <div class="sun"></div>
+    <div class="fighter p1" id="f1"></div>
+    <div class="fighter p2" id="f2"></div>
+    <div class="banner" id="banner"></div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="stats">
+      <div class="stat">Speed<b id="wpm">0</b>WPM</div>
+      <div class="stat">Accuracy<b id="acc">100%</b>&nbsp;</div>
+      <div class="stat">Combo<b id="combo">0</b>&nbsp;</div>
+    </div>
+    <div class="word" id="word" aria-live="off">Press Start fight</div>
+    <div class="queue" id="queue"></div>
+    <p class="hint" id="hint">Type the word to punch. A wrong key breaks your combo and you stumble. Fill the gold meter to unlock a special move.</p>
+    <input id="inp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Typing input">
+  </div>
+
+  <section class="info">
+    <div class="card"><h3>How to fight</h3>
+      <ul>
+        <li>Type the big word letter by letter. Finish it to land a hit.</li>
+        <li>Longer words and bigger combos hit harder.</li>
+        <li>When the gold meter is full, type the SPECIAL word for a huge hit.</li>
+        <li>Win a round by knockout, or by having more health when time runs out.</li>
+      </ul></div>
+    <div class="card"><h3>Recent fights</h3>
+      <table><thead><tr><th>Result</th><th>WPM</th><th>Acc</th><th>Vs</th></tr></thead><tbody id="hist"><tr><td colspan="4">No fights yet.</td></tr></tbody></table></div>
+  </section>
+  <footer>Free to play. Your records are saved only in your own browser.</footer>
+</div>
+
+<div class="overlay" id="resOv" role="dialog" aria-modal="true" aria-labelledby="resTitle">
+  <div class="modal">
+    <h2 id="resTitle">You win!</h2>
+    <p id="resScore"></p>
+    <div class="grid">
+      <div>Speed<b id="mWpm">0</b>WPM</div>
+      <div>Accuracy<b id="mAcc">0%</b>&nbsp;</div>
+      <div>Best combo<b id="mCombo">0</b>&nbsp;</div>
+    </div>
+    <p id="resNote"></p>
+    <div class="row" style="margin-top:14px"><button class="go" id="againBtn">Fight again</button><button class="ghost" id="closeBtn">Close</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var WORDS="fist punch block kick jump dodge power strike guard spin slam crush rush storm blade flame steel thunder shadow knock fierce brave swift sharp quick heavy iron stone fury rage vigor battle combat strong champion victory warrior master legend ninja dragon tiger eagle cobra falcon wolf bear lion hawk rival arena ring bell round fight clash hammer anvil armor shield sword spear arrow trap grip pivot sweep stance balance focus speed timing reflex counter rhythm streak finish ready steady fire wave rock wind earth moon sun star night dawn dusk ember spark bolt flash glow roar growl hunt chase escape defend attack charge launch smash tackle".split(" ");
+var SPECIALS=["thunderstrike","dragonfury","shadowblitz","earthshatter","lightningstorm","phoenixrising","hurricanekick","supernova"];
+var LV={
+  easy:{name:"Rusty",gi:"#4caf6a",band:"#fff",gap:2.8,dmg:4},
+  medium:{name:"Brick",gi:"#ee8a2c",band:"#222",gap:2.0,dmg:5},
+  hard:{name:"Shadow",gi:"#6d4bd1",band:"#ef4a2f",gap:1.4,dmg:5}
+};
+function fighterSVG(gi,band){
+  return '<svg viewBox="0 0 120 190" width="100%" height="100%" aria-hidden="true">'+
+  '<rect x="38" y="112" width="18" height="62" rx="6" fill="#222"/><rect x="62" y="112" width="18" height="62" rx="6" fill="#222"/>'+
+  '<rect x="34" y="170" width="26" height="12" rx="5" fill="#111"/><rect x="60" y="170" width="26" height="12" rx="5" fill="#111"/>'+
+  '<rect x="32" y="62" width="56" height="58" rx="12" fill="'+gi+'"/><rect x="32" y="108" width="56" height="9" fill="'+band+'"/>'+
+  '<rect x="24" y="70" width="16" height="42" rx="8" fill="'+gi+'" transform="rotate(8 32 70)"/><circle cx="30" cy="112" r="9" fill="#ef4a2f"/>'+
+  '<circle cx="60" cy="38" r="21" fill="#f3c9a0"/><rect x="39" y="26" width="42" height="9" fill="'+band+'"/><rect x="76" y="29" width="16" height="5" fill="'+band+'"/>'+
+  '<circle cx="70" cy="42" r="2.6" fill="#222"/><rect x="66" y="52" width="10" height="2.5" rx="1" fill="#8a4b3a"/>'+
+  '<g class="arm"><rect x="70" y="72" width="30" height="14" rx="7" fill="'+gi+'"/><circle cx="104" cy="79" r="11" fill="#ef4a2f"/></g></svg>';
+}
+
+var S={state:"idle",pw:0,ow:0,hp1:100,hp2:100,combo:0,max:0,meter:0,word:"",idx:0,queue:[],special:false,
+  tLeft:60,oppT:2,keys:0,wrong:0,good:0,fightMs:0,last:0,raf:0,timers:[]};
+
+function load(){try{var d=JSON.parse(localStorage.getItem("typebrawl")||"{}");return{wins:d.wins||0,best:d.best||0,combo:d.combo||0,hist:d.hist||[]}}catch(e){return{wins:0,best:0,combo:0,hist:[]}}}
+function save(d){try{localStorage.setItem("typebrawl",JSON.stringify(d))}catch(e){}}
+function records(){var d=load();$("rWins").textContent=d.wins;$("rBest").textContent=d.best;$("rCombo").textContent=d.combo;
+  $("hist").innerHTML=d.hist.length?d.hist.map(function(r){return"<tr><td>"+r.r+"</td><td>"+r.w+"</td><td>"+r.a+"%</td><td>"+r.o+"</td></tr>"}).join(""):'<tr><td colspan="4">No fights yet.</td></tr>'}
+
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+function later(fn,ms){var t=setTimeout(fn,ms);S.timers.push(t);return t}
+function clearTimers(){S.timers.forEach(clearTimeout);S.timers=[];cancelAnimationFrame(S.raf)}
+
+/* audio */
+var ac=null;
+function beep(f,d,type,v){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.type=type||"square";o.frequency.value=f;g.gain.value=v||.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
+
+/* helpers */
+function anim(el,cls,ms){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);later(function(){el.classList.remove(cls)},ms)}
+function floatText(side,txt,color){
+  var a=$("arena"),f=document.createElement("div");f.className="float";f.textContent=txt;f.style.color=color;
+  f.style[side===1?"left":"right"]="19%";f.style.bottom="190px";a.appendChild(f);setTimeout(function(){f.remove()},900)}
+function banner(txt,ms){var b=$("banner");b.textContent=txt;b.classList.add("show");if(ms)later(function(){b.classList.remove("show")},ms)}
+function pips(){
+  [["pips1",S.pw],["pips2",S.ow]].forEach(function(p){var h="";for(var i=0;i<2;i++)h+='<span class="pip'+(i<p[1]?" w":"")+'"></span>';$(p[0]).innerHTML=h});
+}
+function bars(){
+  [["hp1",S.hp1],["hp2",S.hp2]].forEach(function(p){var e=$(p[0]);e.style.width=Math.max(0,p[1])+"%";e.style.background=p[1]>50?"var(--hp)":p[1]>25?"var(--hp-low)":"var(--hp-crit)"});
+  $("meterI").style.width=Math.min(100,S.meter)+"%";$("meter").classList.toggle("full",S.meter>=100);
+}
+function accNow(){return S.keys?Math.max(0,Math.round(100*S.good/S.keys)):100}
+function wpmNow(){var m=S.fightMs/60000;return m>0.008?Math.round((S.good/5)/m):0}
+function hud(){
+  $("timer").textContent=Math.max(0,Math.ceil(S.tLeft));$("wpm").textContent=wpmNow();$("acc").textContent=accNow()+"%";$("combo").textContent=S.combo;
+}
+
+/* words */
+function pull(){
+  if(S.meter>=100){S.word=pick(SPECIALS);S.special=true}
+  else{S.word=S.queue.shift();S.queue.push(pick(WORDS));S.special=false}
+  S.idx=0;drawWord();
+}
+function drawWord(){
+  var w=S.word,h='<span class="ok">'+w.slice(0,S.idx)+'</span><span class="cur">'+w.charAt(S.idx)+'</span>'+w.slice(S.idx+1);
+  if(S.special)h+='<span class="tag">SPECIAL</span>';
+  $("word").innerHTML=h;$("queue").textContent=S.special?"":S.queue.slice(0,4).join("  ");
+  $("panel").classList.toggle("special",S.special);
+}
+
+/* fight flow */
+function newFight(){
+  clearTimers();
+  var L=LV[$("level").value];
+  S.pw=0;S.ow=0;S.keys=0;S.good=0;S.wrong=0;S.fightMs=0;S.max=0;
+  $("f1").innerHTML=fighterSVG("#ef4a2f","#fff");$("f2").innerHTML=fighterSVG(L.gi,L.band);
+  $("oppName").textContent=L.name;$("resOv").classList.remove("show");
+  pips();startRound();
+}
+function startRound(){
+  var L=LV[$("level").value];
+  S.state="count";S.hp1=100;S.hp2=100;S.combo=0;S.meter=0;S.tLeft=60;S.oppT=L.gap;
+  S.queue=[];for(var i=0;i<5;i++)S.queue.push(pick(WORDS));
+  ["f1","f2"].forEach(function(id){$(id).className="fighter "+(id==="f1"?"p1":"p2")});
+  $("word").textContent="Get ready…";$("queue").textContent="";$("panel").classList.remove("special");
+  $("rnd").textContent="Round "+(S.pw+S.ow+1);bars();hud();
+  banner("ROUND "+(S.pw+S.ow+1),900);beep(330,.15);
+  later(function(){banner("FIGHT!",700);beep(660,.3);S.state="fight";pull();S.last=performance.now();$("inp").focus();S.raf=requestAnimationFrame(tick)},1000);
+}
+function tick(now){
+  if(S.state!=="fight")return;
+  var dt=Math.min((now-S.last)/1000,.1);S.last=now;S.fightMs+=dt*1000;S.tLeft-=dt;
+  var L=LV[$("level").value];S.oppT-=dt;
+  if(S.oppT<=0){S.oppT=L.gap*(.7+Math.random()*.6);oppHit(L.dmg+Math.floor(Math.random()*3)-1,false)}
+  hud();
+  if(S.tLeft<=0){S.tLeft=0;timeUp();return}
+  S.raf=requestAnimationFrame(tick);
+}
+function oppHit(d,stumble){
+  anim($("f2"),"punch",280);later(function(){hurtPlayer(d)},120);
+}
+function hurtPlayer(d){
+  if(S.state!=="fight")return;
+  S.hp1-=d;anim($("f1"),"hit",300);floatText(1,"-"+d,"#ff7b66");beep(120,.12,"sawtooth",.05);anim($("arena"),"shake",250);bars();
+  if(S.hp1<=0){S.hp1=0;bars();endRound(false,"K.O.!")}
+}
+function playerHit(len){
+  var mult=1+Math.min(S.combo,20)*.05,d=Math.round((2+len*.6)*mult),special=S.special;
+  if(special)d=28;
+  anim($("f1"),"punch",280);
+  later(function(){
+    if(S.state!=="fight")return;
+    S.hp2-=d;anim($("f2"),"hit",300);floatText(2,"-"+d+(special?"!!":""),special?"#ffcf4a":"#fff");
+    beep(special?90:200,special?.3:.1,"square",.06);if(special||d>=9)anim($("arena"),"shake",250);bars();
+    if(S.hp2<=0){S.hp2=0;bars();endRound(true,"K.O.!")}
+  },110);
+}
+function timeUp(){
+  if(S.hp1===S.hp2){banner("DRAW!\nReplay",1400);S.state="between";later(startRound,1700);return}
+  endRound(S.hp1>S.hp2,"TIME!");
+}
+function endRound(playerWon,txt){
+  if(S.state!=="fight")return;
+  S.state="between";cancelAnimationFrame(S.raf);
+  if(playerWon)S.pw++;else S.ow++;
+  var w=playerWon?$("f1"):$("f2"),l=playerWon?$("f2"):$("f1");
+  l.classList.add("ko");w.classList.add("win");pips();banner(txt,1600);beep(playerWon?784:196,.5,"triangle",.07);
+  if(S.pw===2||S.ow===2)later(matchEnd,1800);else later(startRound,2200);
+}
+function matchEnd(){
+  S.state="over";var won=S.pw===2,wpm=wpmNow(),acc=accNow();
+  var d=load();if(won)d.wins++;if(wpm>d.best)d.best=wpm;if(S.max>d.combo)d.combo=S.max;
+  d.hist.unshift({r:(won?"Win ":"Loss ")+S.pw+"-"+S.ow,w:wpm,a:acc,o:LV[$("level").value].name});d.hist=d.hist.slice(0,8);save(d);records();
+  $("banner").classList.remove("show");
+  $("resTitle").textContent=won?"You win! 🏆":"Knocked out";
+  $("resScore").textContent="Rounds: "+S.pw+" – "+S.ow+" vs "+LV[$("level").value].name;
+  $("mWpm").textContent=wpm;$("mAcc").textContent=acc+"%";$("mCombo").textContent=S.max;
+  $("resNote").textContent=won?(acc<92?"Great fight! Cleaner typing means stronger combos.":"Clean and fast. Try a harder opponent."):"Accuracy keeps your combo alive. Slow down a little and try again.";
+  $("resOv").classList.add("show");$("againBtn").focus();
+}
+
+/* typing */
+function key(ch){
+  if(S.state!=="fight")return;
+  ch=ch.toLowerCase();if(ch.length!==1)return;
+  S.keys++;
+  if(ch===S.word.charAt(S.idx)){
+    S.good++;S.idx++;beep(520+S.idx*18,.03,"square",.02);
+    if(S.idx>=S.word.length){
+      var len=S.word.length;S.combo++;if(S.combo>S.max)S.max=S.combo;
+      if(S.special)S.meter=0;else S.meter+=12;
+      playerHit(len);pull();bars();
+    }else drawWord();
+  }else{
+    S.wrong++;S.combo=0;beep(110,.08,"sawtooth",.04);anim($("word"),"wrong",220);
+    S.hp1-=1;bars();anim($("f1"),"hit",300);
+    if(S.hp1<=0){S.hp1=0;bars();endRound(false,"K.O.!")}
+  }
+  hud();
+}
+$("inp").addEventListener("input",function(){var v=this.value;this.value="";for(var i=0;i<v.length;i++)key(v[i])});
+document.addEventListener("keydown",function(e){
+  if(e.key==="Escape"){quit();return}
+  if(S.state==="fight"&&document.activeElement!==$("inp")&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){e.preventDefault();key(e.key)}
+  if(S.state==="fight"&&e.key===" ")e.preventDefault();
+});
+$("panel").addEventListener("click",function(){if(S.state==="fight")$("inp").focus()});
+$("arena").addEventListener("click",function(){if(S.state==="fight")$("inp").focus()});
+
+function quit(){
+  if(S.state==="idle")return;
+  clearTimers();S.state="idle";$("resOv").classList.remove("show");$("banner").classList.remove("show");
+  $("word").textContent="Press Start fight";$("queue").textContent="";$("panel").classList.remove("special");
+  S.hp1=S.hp2=100;S.meter=0;S.combo=0;bars();hud();["f1","f2"].forEach(function(id){$(id).classList.remove("ko","win")});
+}
+$("startBtn").addEventListener("click",newFight);
+$("againBtn").addEventListener("click",newFight);
+$("quitBtn").addEventListener("click",quit);
+$("closeBtn").addEventListener("click",function(){$("resOv").classList.remove("show");$("startBtn").focus()});
+$("level").addEventListener("change",function(){if(S.state==="idle"){$("f2").innerHTML=fighterSVG(LV[this.value].gi,LV[this.value].band);$("oppName").textContent=LV[this.value].name}});
+
+$("f1").innerHTML=fighterSVG("#ef4a2f","#fff");$("f2").innerHTML=fighterSVG(LV.medium.gi,LV.medium.band);
+pips();bars();hud();records();
+})();
+</script>
+</body>
+</html>
